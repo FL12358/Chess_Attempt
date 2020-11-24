@@ -6,8 +6,9 @@ using namespace std;
 int BOARD_SIZE = 8;
 
 enum Colour{
-    white,
-    black
+    empty = 0,
+    white = -1,
+    black = 1
 };
 
 struct Position{
@@ -147,7 +148,7 @@ void PrintBoard(Board board){
             for(auto piece : board.pieces){
                 if(piece->pos.x == j && piece->pos.y == i){
                     string pad = " ";
-                    if(piece->colour) pad = "*";
+                    if(piece->colour == 1) pad = "*";
                     square = pad + piece->type + pad;
                 }
             }
@@ -157,6 +158,61 @@ void PrintBoard(Board board){
     }
 }
 
+bool IsPosOnBoard(Position pos){
+    if(pos.x < 8 && pos.x >= 0 && pos.y < 8 && pos.y >= 0) return true;
+    return false;
+}
+
+bool IsPathClear(Position newPos, Piece piece, Board board){
+    // check squres between piece.pos and newPos for pieces
+    vector<Position> path;
+    int xDir = piece.pos.x>newPos.x ? 1 : -1;
+    int yDir = piece.pos.y>newPos.y ? 1 : -1;
+
+    if(newPos.x == piece.pos.x || newPos.y == piece.pos.y){ //Rook
+        if(newPos.x == piece.pos.x){ //up/down
+            for(int i=1;i<abs(piece.pos.y-newPos.y);i++){
+                for(auto p : board.pieces){
+                    if(p->pos.y == piece.pos.y + yDir*i) return false;
+                }
+            }
+        }else{  // left/right
+            for(int i=1;i<abs(piece.pos.x-newPos.x);i++){
+                for(auto p : board.pieces){
+                    if(p->pos.x == piece.pos.x + xDir*i) return false;
+                }
+            }
+        }
+    }else{  // Bishop
+        int xDir = piece.pos.x>newPos.x ? 1 : -1;
+        int yDir = piece.pos.y>newPos.y ? 1 : -1;
+
+        for(int i=1;i<abs(piece.pos.x-newPos.x);i++){
+            for(auto p : board.pieces){
+                if(p->pos.x == piece.pos.x + xDir*i && p->pos.y == piece.pos.y + yDir*i) 
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
+int CheckTargetSquare(Position newPos, Piece piece, Board board){ 
+    // checks target square for other pieces 
+    // same colour: -1, empty: 0, other colour: 1
+    for(auto p : board.pieces){
+        if(newPos.x == p->pos.x && newPos.y == p->pos.y){
+            if(piece.colour == p->colour){
+                return -1;
+            }else return 1;
+        }
+    }
+    return 0;
+}
+
+Board PieceMove(Board board, Piece piece, Position newPos){
+    
+}
 
 int main() { 
     Board board;
