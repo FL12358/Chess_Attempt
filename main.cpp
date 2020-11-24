@@ -5,27 +5,29 @@ using namespace std;
 
 int BOARD_SIZE = 8;
 
+enum Colour{
+    white,
+    black
+};
+
+struct Position{
+    int x;
+    int y;
+};
 
 class Piece {
     public:
-        int pos[2]; // [a-h][1-8]
-        char type;
-        bool hasMoved;
-        bool isWhite;
-        std::vector<int[2]> moveSet;
-        bool repMoves; // if piece can move multiple values of "moveSet"
-        
-        Piece(){
-            hasMoved = false;
-        }
-        bool canMove(int x, int y){
-            for(auto i : moveSet){
-                if((x-pos[0] == i[0]) && (y-pos[1] == i[1])){
-                    return true;
-                }
-            }
-            return false;
-        }
+    Position pos; // [a-h][1-8]
+    char type;
+    bool hasMoved;
+    Colour colour;
+    
+    Piece(){
+        hasMoved = false;
+    }
+    bool canMove(Position newPos){
+        return false;
+    }
 };
 
 struct Board{
@@ -35,48 +37,100 @@ struct Board{
 
 class Rook: public Piece {
     public: 
-        Rook(int x, int y, bool colour){
-            isWhite = colour;
-            pos[0] = x;
-            pos[1] = y;
-            type = 'R';
-            repMoves = true;
+    Rook(Position setPos, Colour pieceColour){
+        colour = pieceColour;
+        pos.x = setPos.x;
+        pos.y = setPos.y;
+        type = 'R';
         } 
-        bool canMove(int x, int y){
-            if(pos[0] == x && pos[1] == y) return false;
-                
-            if(pos[0] == x || pos[1] == y){
-                return true;
-            }
-            return false;
-        }
+
+    bool canMove(Position newPos){
+        if(pos.x == newPos.x && pos.y == newPos.y) return false;    
+        if(pos.x == newPos.x || pos.y == newPos.y) return true;
+        return false;
+    }
 };
 
 
 
 class Bishop: public Piece {
     public:
-        Bishop(int x, int y, bool colour){
-            pos[0] = x;
-            pos[1] = y;
-            type = 'B';
-            repMoves = true;
-            isWhite = colour;
-        }
-        bool canMove(int x, int y){
-            if(pos[0] == x && pos[1] == y) return false;
-
-            if(abs(pos[0]-x) == abs(pos[1]-y)){
-                return true;
-            }
-            return false;
-        }
+    Bishop(Position setPos, Colour pieceColour){
+        pos.x = setPos.x;
+        pos.y = setPos.y;
+        type = 'B';
+        colour = pieceColour;
+    }
+    bool canMove(Position newPos){
+        if(pos.x == newPos.x && pos.y == newPos.y) return false;
+        if(abs(pos.x-newPos.x) == abs(pos.y-newPos.y)) return true;
+        return false;
+    }
 };
+
+class Queen: public Piece {
+    public:
+    Queen(Position setPos, Colour pieceColour){
+        pos.x = setPos.x;
+        pos.y = setPos.y;
+        type = 'Q';
+        colour = pieceColour;
+    }
+    bool canMove(Position newPos){
+        if(pos.x == newPos.x && pos.y == newPos.y) return false;
+        if(abs(pos.x-newPos.x) == abs(pos.y-newPos.y)) return true;
+        if(pos.x == newPos.x || pos.y == newPos.y) return true;
+        return false;
+    }
+};
+
+class Knight: public Piece {
+    public:
+    Knight(Position setPos, Colour pieceColour){
+        pos.x = setPos.x;
+        pos.y = setPos.y;
+        type = 'N';
+        colour = pieceColour;
+    }
+    bool canMove(Position newPos){
+        if(abs(pos.x-newPos.x) == 1 && abs(pos.y-newPos.y) == 2) return true;
+        if(abs(pos.x-newPos.x) == 2 && abs(pos.y-newPos.y) == 1) return true;
+        return false;
+    }
+};
+
+class Pawn: public Piece {
+    public:
+    Pawn(Position setPos, Colour pieceColour){
+        pos.x = setPos.x;
+        pos.y = setPos.y;
+        type = 'P';
+        colour = pieceColour;
+        bool justDoubled = false;
+    }
+    bool canMove(Position newPos){
+        int maxMove;
+        if(hasMoved) maxMove = 1;
+        if(!hasMoved) maxMove = 2;
+        int move = newPos.y - pos.y;
+        cout << move << endl;
+
+        if(pos.x != newPos.x) return false;
+        if(abs(move) <= maxMove && move > 0 && colour == white) return true;
+        if(abs(move) <= maxMove && move < 0 && colour == black) return true;
+        return false;
+    }
+};
+
 
 void PrintHorLine(){
     cout << endl;
     for(int i=0;i<=4*BOARD_SIZE;i++){
-        cout << "-";
+        if(i%4){
+            cout << "-";
+        }else{
+            cout << " ";
+        }
     }
     cout << endl;
 }
@@ -91,9 +145,9 @@ void PrintBoard(Board board){
             std::string square = "   ";
 
             for(auto piece : board.pieces){
-                if(piece->pos[0] == i && piece->pos[1] == j){
+                if(piece->pos.x == j && piece->pos.y == i){
                     string pad = " ";
-                    if(!piece->isWhite) pad = "*";
+                    if(piece->colour) pad = "*";
                     square = pad + piece->type + pad;
                 }
             }
@@ -101,25 +155,30 @@ void PrintBoard(Board board){
         }
         PrintHorLine();
     }
-
 }
 
 
 int main() { 
-    std::cout<<"Hello World" << std::endl; 
     Board board;
-    Rook* rook1 = new Rook(1,2, false);
-    Bishop* bish1 = new Bishop(4,4,true);
-    board.pieces.push_back(rook1);
-    board.pieces.push_back(bish1);
-    cout << bish1->isWhite << " " << rook1->isWhite << endl;
+    Position egPos;
+
+
+
+    egPos.x = 0;
+    egPos.y = 5;
+    Queen* queen1 = new Queen(egPos, black);
+    board.pieces.push_back(queen1);
+
+    
     PrintBoard(board);
 
-    if(rook1->canMove(2,1)){
+    egPos.x = 5;
+    egPos.y = 0;
+    if(queen1->canMove(egPos)){
         cout << "valid move\n";
     }else{
         cout << "invalid move\n";
     }
-    return 0; 
-} 
+    return 0;
+}
 
