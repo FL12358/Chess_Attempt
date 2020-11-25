@@ -1,5 +1,6 @@
 #include<iostream>
 #include<vector>
+#include<sstream>
 
 using namespace std;
 
@@ -26,15 +27,29 @@ class Piece {
     Piece(){
         hasMoved = false;
     }
-    bool canMove(Position newPos){
-
-    }
+    virtual bool canMove(Position newPos) = 0; // If peice can move to square if empty board
 };
 
 struct Board{
     std::vector<Piece*> pieces;
-    int turn;
+    int move; // number of moves
+    int hmClock; // halfmove clock
+    Position enPass;
+    bool whiteToPlay;
+    bool wKcast;
+    bool wQcast;
+    bool bKcast;
+    bool bQcast;
+
 };
+
+int IsSquareAttacked(Position square, Colour attackedBy, Board board);
+
+Colour OtherColour(Colour c){
+    if(c == white) return black;
+    if(c == black) return white;
+    if(c == empty) return empty;
+}
 
 class Rook: public Piece {
     public: 
@@ -51,8 +66,6 @@ class Rook: public Piece {
         return false;
     }
 };
-
-
 
 class Bishop: public Piece {
     public:
@@ -100,6 +113,11 @@ class King: public Piece {
         if((changeX == 0 || changeX == 1) && (changeY == 0 || changeY == 1)) return true;
         return false;
     }
+    bool inCheck(Board board){
+        for(auto p : board.pieces){
+            return IsSquareAttacked(pos, OtherColour(colour), board);
+        }
+    }
 };
 
 class Knight: public Piece {
@@ -138,7 +156,6 @@ class Pawn: public Piece {
         return false;
     }
 };
-
 
 void PrintHorLine(){
     cout << endl;
@@ -230,7 +247,6 @@ Board PieceMove(Position newPos, Piece* piece, Board board){ // Simply moves a p
             i->hasMoved = true;
         }
     }
-    board.turn++;
     return board;
 }
 
@@ -254,7 +270,7 @@ Board AttemptMove(Position newPos, Piece* piece, Board board){
                 break;
             case 1:
                 board = PieceCapture(newPos, board);
-                board = PieceMove(newPos, piece, board);
+                board = PieceMove(newPos, piece, board); 
                 break;
         }
     }else{
@@ -263,32 +279,146 @@ Board AttemptMove(Position newPos, Piece* piece, Board board){
     return board;
 }
 
+int IsSquareAttacked(Position square, Colour attackedBy, Board board){ 
+    // Returns number of attackers of Colour "attackedBy" aiming at an input square
+    int retVal = 0;
+    for(auto p : board.pieces){
+        if(IsPathClear(square, p, board) && p->canMove(square) && p->colour == attackedBy){
+            ++retVal;
+        }
+    }
+    return retVal; 
+}
+
+Piece* FENCharToPiece(char ch, Position pos){
+    Colour colour = white;
+    if(ch > 90){
+        ch -= 32;
+        colour = black;
+    }
+    switch (ch){
+        case 'R':{
+            return new Rook(pos, colour);
+            break;
+            }
+        case 'N':{
+            return new Knight(pos, colour);
+            break;
+            }
+        case 'B':{
+            return new Bishop(pos, colour);
+            break;
+            }
+        case 'Q':{
+            return new Queen(pos, colour);
+            break;
+            }
+        case 'K':{
+            return new King(pos, colour);
+            break;
+            }
+        case 'P':{
+            return new Pawn(pos, colour);
+            break;
+            }
+        default:
+            cout << "FEN piece error: " << ch << endl;
+            exit(EXIT_FAILURE);
+    }
+}
+
+Position NotationToPos(string str){
+    Position pos;
+    if(str[0] > 90) str[0] -= 32;
+    pos.x = str[0] - 65;
+    pos.y = str[1] - 49;
+
+    return pos;
+}
+
+Board FENToBoard(string fen){
+    Board board;
+    int fenSplit = fen.find_first_of(" ");
+    string temp = fen.substr(0, fenSplit);
+    vector<string>rows;
+
+    while(temp.size()){
+        int index = temp.find("/");
+        if(index!=string::npos){
+            rows.push_back(temp.substr(0,index));
+            temp = temp.substr(index+1);
+            if(temp.size()==0)rows.push_back(temp);
+        }else{
+            rows.push_back(temp);
+            temp = "";
+        }
+    }
+    
+    for(int i=rows.size()-1;i>=0;i--){ // Piece setup
+        int jCoord = 0;
+        for(int j=0;j<rows[i].size();j++){
+            
+            if(isdigit(rows[i][j])){ // if number (1-8) found
+                jCoord += rows[i][j] - 48 -1; // ascii to number
+            }else{
+                Position pos;
+                pos.x = jCoord;
+                pos.y = BOARD_SIZE - i - 1;
+                board.pieces.push_back(FENCharToPiece(rows[i][j], pos));
+            }
+            jCoord++;
+        }
+        
+    }
+
+    string props = fen.substr(fenSplit);
+    vector<string> propsVec;
+    while(props.size()){
+        int index = props.find(" ");
+        if(index!=string::npos){
+            propsVec.push_back(props.substr(0,index));
+            props = props.substr(index+1);
+            if(props.size()==0)propsVec.push_back(props);
+        }else{
+            propsVec.push_back(props);
+            props = "";
+        }
+    }
+    cout << NotationToPos("E4").x << endl;
+    board.whiteToPlay = (propsVec[1][0] == 'w');
+
+    board.wKcast = false;
+    board.wQcast = false;
+    board.bKcast = false;
+    board.bQcast = false;
+    for(char c : propsVec[2]){
+        if(c == 'K') board.wKcast = true;
+        if(c == 'Q') board.wQcast = true;
+        if(c == 'k') board.bKcast = true;
+        if(c == 'q') board.bQcast = true;
+    }
+
+    // board.enPass = algebraToPos(propsVec[3]);
+
+    board.hmClock = stoi(propsVec[4]);
+    board.move = stoi(propsVec[5]);
+    
+    return board;
+}
+
 int main() { 
     Board board;
-    board.turn = 0;
+
+    string startFEN;
+    startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+    //startFEN = "8/8/8/8/8/8/8/8 b KQkq - 1 2";
+    board = FENToBoard(startFEN);
+
+    PrintBoard(board);
 
     Position egPos;
-
-    egPos.x = 3;
-    egPos.y = 5;
-    Rook* rook1 = new Rook(egPos, white);
-    board.pieces.push_back(rook1);
-
-    egPos.x = 0;
-    egPos.y = 5;
-    Queen* queen1 = new Queen(egPos, black);
-    board.pieces.push_back(queen1);
-    egPos.x = 3;
-    egPos.y = 5;
-
     
-    PrintBoard(board);
-    board = AttemptMove(egPos, queen1, board);
-    PrintBoard(board);
-    egPos.y = 2;
-    board = AttemptMove(egPos, queen1, board);
-    PrintBoard(board);
-    
+
     return 0;
 }
 
