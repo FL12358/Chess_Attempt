@@ -7,8 +7,8 @@ using namespace std;
 int BOARD_SIZE = 8;
 
 enum Colour{
-    empty = 0,
-    white = -1,
+    empty = -1,
+    white = 0,
     black = 1
 };
 
@@ -169,6 +169,10 @@ void PrintHorLine(){
     cout << endl;
 }
 
+void PrintHorFiles(){
+    cout << "  a   b   c   d   e   f   g   h  "<< endl;
+}
+
 void PrintBoard(Board board){
     PrintHorLine();
     for(int i=BOARD_SIZE-1;i>=0;i--){
@@ -184,9 +188,11 @@ void PrintBoard(Board board){
                 }
             }
             cout << square << "|";
+            if(j == 7) cout << " " << i+1;
         }
         PrintHorLine();
     }
+    PrintHorFiles();
 }
 
 bool IsPosOnBoard(Position pos){
@@ -205,13 +211,13 @@ bool IsPathClear(Position newPos, Piece* piece, Board board){
         if(newPos.x == piece->pos.x){ //up/down
             for(int i=1;i<abs(piece->pos.y-newPos.y);i++){
                 for(auto p : board.pieces){
-                    if(p->pos.y == piece->pos.y + yDir*i) return false;
+                    if(p->pos.y == piece->pos.y + yDir*i && p->pos.x == piece->pos.x) return false;
                 }
             }
         }else{  // left/right
             for(int i=1;i<abs(piece->pos.x-newPos.x);i++){
                 for(auto p : board.pieces){
-                    if(p->pos.x == piece->pos.x + xDir*i) return false;
+                    if(p->pos.x == piece->pos.x + xDir*i && p->pos.y == piece->pos.y) return false;
                 }
             }
         }
@@ -247,10 +253,11 @@ Board PieceMove(Position newPos, Piece* piece, Board board){ // Simply moves a p
             i->hasMoved = true;
         }
     }
+    board.move++;
     return board;
 }
 
-Board PieceCapture(Position capPos, Board board){
+Board PieceCapture(Position capPos, Board board){ // deletes a piece in certain position
     for(int i=0;i<board.pieces.size();i++){
         if(capPos.x == board.pieces[i]->pos.x && capPos.y == board.pieces[i]->pos.y){
             board.pieces.erase(board.pieces.begin()+i);
@@ -259,22 +266,37 @@ Board PieceCapture(Position capPos, Board board){
     return board;
 }
 
-Board AttemptMove(Position newPos, Piece* piece, Board board){
+bool IsMoveValid(Position newPos, Piece* piece, Board board){
+    
     if(IsPosOnBoard(newPos) && IsPathClear(newPos, piece, board) && piece->canMove(newPos)){
         switch(CheckTargetSquare(newPos, piece, board)){
             case -1:
                 cout << "take own piece error\n";
+                return false;
                 break;
             case 0:
-                board = PieceMove(newPos, piece, board);
+                return true;
                 break;
             case 1:
-                board = PieceCapture(newPos, board);
-                board = PieceMove(newPos, piece, board); 
+                return true;
                 break;
         }
-    }else{
-        cout << "Move not good\n";
+    }
+    return false;
+}
+
+Board AttemptMove(Position newPos, Piece* piece, Board board){
+    switch(CheckTargetSquare(newPos, piece, board)){
+        case -1:
+            cout << "take own piece error\n";
+            break;
+        case 0:
+            board = PieceMove(newPos, piece, board);
+            break;
+        case 1:
+            board = PieceCapture(newPos, board);
+            board = PieceMove(newPos, piece, board); 
+            break;
     }
     return board;
 }
@@ -288,6 +310,25 @@ int IsSquareAttacked(Position square, Colour attackedBy, Board board){
         }
     }
     return retVal; 
+}
+
+Position NotationCoordToPos(string input){
+    Position pos;
+    if(input[0] > 90) input[0] -= 32;
+    pos.x = input[0] - 65;
+    pos.y = input[1] - 49;
+
+    return pos;
+}
+
+char NotationPeice(string input){
+    if(input.size() == 2) return 'P';
+    return toupper(input[0]);
+}
+
+Position NotationToPos(string input){
+    string coord = input.substr(input.size()-2);
+    return NotationCoordToPos(coord);
 }
 
 Piece* FENCharToPiece(char ch, Position pos){
@@ -327,15 +368,6 @@ Piece* FENCharToPiece(char ch, Position pos){
     }
 }
 
-Position NotationToPos(string str){
-    Position pos;
-    if(str[0] > 90) str[0] -= 32;
-    pos.x = str[0] - 65;
-    pos.y = str[1] - 49;
-
-    return pos;
-}
-
 Board FENToBoard(string fen){
     Board board;
     int fenSplit = fen.find_first_of(" ");
@@ -368,7 +400,6 @@ Board FENToBoard(string fen){
             }
             jCoord++;
         }
-        
     }
 
     string props = fen.substr(fenSplit);
@@ -384,7 +415,7 @@ Board FENToBoard(string fen){
             props = "";
         }
     }
-    cout << NotationToPos("E4").x << endl;
+    cout << NotationCoordToPos("E4").x << endl;
     board.whiteToPlay = (propsVec[1][0] == 'w');
 
     board.wKcast = false;
@@ -406,13 +437,44 @@ Board FENToBoard(string fen){
     return board;
 }
 
+void SimplePlay(Board board){
+    int oldMoveNum = board.move;
+    while(1){
+        PrintBoard(board);
+        if(board.whiteToPlay){
+            cout << "White: ";
+            
+        }else{
+            cout << "Black: ";
+        }
+        
+
+        string input;
+        cin >> input;
+        Position pos = NotationToPos(input);
+        char type = NotationPeice(input);
+        for(auto i : board.pieces){
+            if(i->type == type && board.whiteToPlay != i->colour && IsMoveValid(pos, i, board)){
+                board = AttemptMove(pos, i, board);
+            }
+        }
+        cout << board.move << endl;
+        if(board.move != oldMoveNum){
+            cout << "Move sucess\n";
+            //board.whiteToPlay = !board.whiteToPlay;
+            oldMoveNum = board.move;
+        }
+    }
+}
+
 int main() { 
     Board board;
-
+    board.move = 1;
     string startFEN;
     startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    //startFEN = "8/8/8/8/8/8/8/8 b KQkq - 1 2";
+    startFEN = "8/8/2Q5/8/8/5n2/8/8 w KQkq - 0 2";
     board = FENToBoard(startFEN);
+    SimplePlay(board);
 
     PrintBoard(board);
 
