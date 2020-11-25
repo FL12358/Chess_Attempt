@@ -137,22 +137,27 @@ class Knight: public Piece {
 
 class Pawn: public Piece {
     public:
+    bool justDoubled;
+    bool canTakeL;
+    bool canTakeR;
     Pawn(Position setPos, Colour pieceColour){
         pos.x = setPos.x;
         pos.y = setPos.y;
         type = 'P';
         colour = pieceColour;
-        bool justDoubled = false;
+        justDoubled = false;
+        canTakeL = false;
+        canTakeR = false;
     }
     bool canMove(Position newPos){
-        int maxMove;
-        if(hasMoved) maxMove = 1;
-        if(!hasMoved) maxMove = 2;
-        int move = newPos.y - pos.y;
-
-        if(pos.x != newPos.x) return false;
-        if(abs(move) <= maxMove && move > 0 && colour == white) return true;
-        if(abs(move) <= maxMove && move < 0 && colour == black) return true;
+        int maxMove = hasMoved ? 1 : 2;
+        int ymove = newPos.y - pos.y;
+        int xmove = newPos.x - pos.x;
+        if(pos.x != newPos.x && !(canTakeL || canTakeR)) return false;
+        if(canTakeL && xmove == -1 && abs(ymove) == 1) return true; // diagonal captures
+        if(canTakeR && xmove == 1 && abs(ymove) == 1) return true;
+        if(abs(ymove) <= maxMove && ymove > 0 && colour == white && !xmove) return true;    // forwards moves
+        if(abs(ymove) <= maxMove && ymove < 0 && colour == black && !xmove) return true;
         return false;
     }
 };
@@ -266,8 +271,34 @@ Board PieceCapture(Position capPos, Board board){ // deletes a piece in certain 
     return board;
 }
 
+Piece* SetPawnCaptureFlags(Pawn* pawn, Board board){
+    int yMove = pawn->colour ? -1 : 1;
+    bool lMove = false;
+    bool rMove = false;
+    for(auto i : board.pieces){ // for each piece on board
+        if(i->colour == OtherColour(pawn->colour) && i->pos.y == pawn->pos.y + yMove){
+            // check if pawn "i" is 1-diagonal to "pawn" -> set pawn.flag correctly
+            if(i->pos.x == pawn->pos.x-1){
+                lMove = true;
+            }
+            if(i->pos.x == pawn->pos.x+1){
+                rMove = true;
+            }
+        }
+    }
+    pawn->canTakeL = lMove;
+    pawn->canTakeR = rMove;
+    return pawn;
+}
+
 bool IsMoveValid(Position newPos, Piece* piece, Board board){
-    
+    if(piece->type == 'P'){ // If moving a pawn
+        piece = SetPawnCaptureFlags((Pawn*)piece, board);
+        for(auto p : board.pieces){
+            if(p->pos.x == newPos.x && p->pos.y == newPos.y && piece->pos.x == newPos.x) return false;
+        }
+    }
+
     if(IsPosOnBoard(newPos) && IsPathClear(newPos, piece, board) && piece->canMove(newPos)){
         switch(CheckTargetSquare(newPos, piece, board)){
             case -1:
@@ -415,7 +446,6 @@ Board FENToBoard(string fen){
             props = "";
         }
     }
-    cout << NotationCoordToPos("E4").x << endl;
     board.whiteToPlay = (propsVec[1][0] == 'w');
 
     board.wKcast = false;
@@ -437,7 +467,7 @@ Board FENToBoard(string fen){
     return board;
 }
 
-void SimplePlay(Board board){
+void SimplePlay(Board board){ // simple loop to take turns attempting moves
     int oldMoveNum = board.move;
     while(1){
         PrintBoard(board);
@@ -458,11 +488,11 @@ void SimplePlay(Board board){
                 board = AttemptMove(pos, i, board);
             }
         }
-        cout << board.move << endl;
         if(board.move != oldMoveNum){
-            cout << "Move sucess\n";
-            //board.whiteToPlay = !board.whiteToPlay;
+            cout << "Move " << board.move << " sucess\n";
+            board.whiteToPlay = !board.whiteToPlay;
             oldMoveNum = board.move;
+            // Check for Check
         }
     }
 }
@@ -472,7 +502,7 @@ int main() {
     board.move = 1;
     string startFEN;
     startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    startFEN = "8/8/2Q5/8/8/5n2/8/8 w KQkq - 0 2";
+    //startFEN = "3p4/8/2Q5/8/8/5n2/8/4P3 w KQkq - 0 2";
     board = FENToBoard(startFEN);
     SimplePlay(board);
 
