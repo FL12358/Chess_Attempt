@@ -353,7 +353,6 @@ Board PieceMove(Position newPos, int pIdx, Board board){ // Simply moves a piece
 Board PieceCapture(Position capPos, int pIdx, Board board){ // deletes a piece in certain position
     for(int i=0;i<board.pieces.size();i++){
         if(capPos.x == board.pieces[i]->pos.x && capPos.y == board.pieces[i]->pos.y && i != pIdx){
-            cout << "CAPTURED: " << board.pieces[i]->type << i << endl;
             board.pieces.erase(board.pieces.begin()+i);
             break;
         }
@@ -378,8 +377,9 @@ Pawn* EnPassantMove(Pawn* p1, Pawn* p2){
 
 Board EnPassantCapture(Position newPos, int pIdx, Board board){ // If pawn has just been en passant captured
     /// TODO SEG FAULT HERE
+    Couter(":EnPassantCapture:");
     Pawn* pawn = (Pawn*)board.pieces[pIdx];
-    int yPos = pawn->colour==white ? 2 : 5; // ranks on which a capturer will land
+    int yPos = pawn->colour == white ? 2 : 5; // ranks on which a capturer will land
     if(newPos.x == pawn->pos.x && yPos == newPos.y && pawn->justDoubled){
         board = PieceCapture(pawn->pos, pIdx, board);
     }
@@ -580,10 +580,12 @@ Board MakeMove(Position newPos, int pIdx, Board board){
     for(auto p : board.pieces){ // if en passant chance not taken 
         if(p->type == 'P'){
             //board = EnPassantCapture(newPos, pIdx, board);
-            //p = SetPawnDoubleMove((Pawn*)p, false);
+            Couter("EnP'ed");
+            p = SetPawnDoubleMove((Pawn*)p, false);
+            Couter("Pawn flagged");
         }
     }
-
+    Couter("Double?");
     if(board.pieces[pIdx]->type == 'P' && abs(newPos.y - board.pieces[pIdx]->pos.y) == 2){ // If piece has made itself open to en passant
         board.pieces[pIdx] = SetPawnDoubleMove((Pawn*)board.pieces[pIdx], true);
     }
@@ -597,9 +599,7 @@ Board MakeMove(Position newPos, int pIdx, Board board){
             break;
         case 1:
             board = PieceMove(newPos, pIdx, board); // pIdx loses meaning when num peices changed
-            Couter("1");
             board = PieceCapture(newPos, pIdx, board);
-            Couter("2");
             break;
     }
     return board;
@@ -728,7 +728,6 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
                 cout << "Making move: " << board.pieces[i]->type << pos.x << pos.y<< " " << endl;
 
                 board = MakeMove(pos, i, board);
-                Couter("Made move");
             }
         }
         if(board.move != oldMoveNum){
@@ -742,7 +741,6 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             if(board.check == white) cout << "white in check\n";
             if(board.check == black) cout << "black in check\n";
         IsCheckMate(board);
-        cout << "Num pieces: " << board.pieces.size() << endl;
     }
 }
 
