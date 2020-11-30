@@ -12,12 +12,17 @@ void Couter(string str){
     if(DEBUG) cout << str << endl;
 }
 
-
 enum Colour{
     empty = -1,
     white = 0,
     black = 1
 };
+
+Colour OtherColour(Colour c){
+    if(c == white) return black;
+    if(c == black) return white;
+    if(c == empty) return empty;
+}
 
 enum GameResult{
     notEnded = 0,
@@ -35,50 +40,48 @@ class Piece {
     public:
     Position pos; // [a-h][1-8]
     char type;
-    bool hasMoved;
+    bool hasMoved = false;
     Colour colour;
     
     Piece(){
-        hasMoved = false;
     }
     virtual bool canMove(Position newPos) = 0; // If piece can move to square if empty board
 };
 
-struct Board{
+Piece* PieceGenerator(char ch, Position pos);
+
+class Board{
+    public:
     std::vector<Piece*> pieces;
     int move; // number of moves
     int hmClock; // halfmove clock
     Position enPass;
     bool whiteToPlay;
-    bool wKcast;
-    bool wQcast;
-    bool bKcast;
-    bool bQcast;
+    bool wKcast,wQcast,bKcast,bQcast;
     Colour check;
+
+    Board CopyBoard(){
+        Board retBoard;
+        retBoard.bKcast = bKcast;
+        retBoard.bQcast = bQcast;
+        retBoard.wKcast = wKcast;
+        retBoard.wQcast = wQcast;
+        retBoard.check = check;
+        retBoard.hmClock = hmClock;
+        retBoard.move = move;
+        retBoard.whiteToPlay = whiteToPlay;
+        retBoard.pieces.clear();
+
+        for(int i=0;i<pieces.size();i++){
+            Piece* tempP = PieceGenerator(pieces[i]->type, pieces[i]->pos);
+            tempP->colour = pieces[i]->colour;
+            tempP->hasMoved = pieces[i]->hasMoved;
+            retBoard.pieces.push_back(tempP);
+        }
+        return retBoard;
+    }
 };
 
-Piece* CharToPiece(char ch, Position pos);
-
-Board CopyBoard(Board board){
-    Board retBoard;
-    retBoard.bKcast = board.bKcast;
-    retBoard.bQcast = board.bQcast;
-    retBoard.wKcast = board.wKcast;
-    retBoard.wQcast = board.wQcast;
-    retBoard.check = board.check;
-    retBoard.hmClock = board.hmClock;
-    retBoard.move = board.move;
-    retBoard.whiteToPlay = board.whiteToPlay;
-    retBoard.pieces.clear();
-
-    for(int i=0;i<board.pieces.size();i++){
-        Piece* tempP = CharToPiece(board.pieces[i]->type, board.pieces[i]->pos);
-        tempP->colour = board.pieces[i]->colour;
-        tempP->hasMoved = board.pieces[i]->hasMoved;
-        retBoard.pieces.push_back(tempP);
-    }
-    return retBoard;
-}
 
 class GameHistory{
     public:
@@ -86,7 +89,7 @@ class GameHistory{
     int currentMove = 0;
 
     void AddBoard(Board board){
-        Board tempB = CopyBoard(board);
+        Board tempB = board.CopyBoard();
         cout << tempB.move;
         if(!history.size()){
             history.push_back(tempB); // if next move in normal game add to end of 
@@ -104,12 +107,6 @@ class GameHistory{
 };
 
 int IsSquareAttacked(Position square, Colour attackedBy, Board board);
-
-Colour OtherColour(Colour c){
-    if(c == white) return black;
-    if(c == black) return white;
-    if(c == empty) return empty;
-}
 
 class Rook: public Piece {
     public: 
@@ -192,9 +189,9 @@ class Knight: public Piece {
 
 class Pawn: public Piece {
     public:
-    bool justDoubled;
-    bool canTakeL;
-    bool canTakeR;
+    bool justDoubled = false;
+    bool canTakeL = false;
+    bool canTakeR = false;
     Pawn(Position setPos, Colour pieceColour){
         pos.x = setPos.x;
         pos.y = setPos.y;
@@ -217,7 +214,7 @@ class Pawn: public Piece {
     }
 };
 
-Piece* CharToPiece(char ch, Position pos){
+Piece* PieceGenerator(char ch, Position pos){
     Colour colour = white;
     if(ch > 90){
         ch -= 32;
@@ -346,7 +343,6 @@ int CheckTargetSquare(Position newPos, int pIdx, Board board){
 
 Board PieceMove(Position newPos, int pIdx, Board board){ // Simply moves a piece / return new board state
     board.pieces[pIdx]->pos = newPos;
-    board.move++;
     return board;
 }
 
@@ -360,7 +356,7 @@ Board PieceCapture(Position capPos, int pIdx, Board board){ // deletes a piece i
     return board;
 }
 
-Pawn* EnPassantMove(Pawn* p1, Pawn* p2){
+Pawn* EnPassantFlags(Pawn* p1, Pawn* p2){
     if(p2->justDoubled && p2->colour != p1->colour && p2->pos.y == p1->pos.y){
         // check if p2 has just jumped -> go 
         if(p2->pos.x == p1->pos.x-1){
@@ -373,17 +369,6 @@ Pawn* EnPassantMove(Pawn* p1, Pawn* p2){
         }
     }
     return p1;
-}
-
-Board EnPassantCapture(Position newPos, int pIdx, Board board){ // If pawn has just been en passant captured
-    /// TODO SEG FAULT HERE
-    Couter(":EnPassantCapture:");
-    Pawn* pawn = (Pawn*)board.pieces[pIdx];
-    int yPos = pawn->colour == white ? 2 : 5; // ranks on which a capturer will land
-    if(newPos.x == pawn->pos.x && yPos == newPos.y && pawn->justDoubled){
-        board = PieceCapture(pawn->pos, pIdx, board);
-    }
-    return board;
 }
 
 Piece* SetPawnCaptureFlags(Pawn* pawn, Board board){
@@ -401,7 +386,7 @@ Piece* SetPawnCaptureFlags(Pawn* pawn, Board board){
             }
         }
         if(i->type == 'P'){
-            pawn = EnPassantMove(pawn, (Pawn*)i);
+            pawn = EnPassantFlags(pawn, (Pawn*)i);
         }
     }
     return pawn;
@@ -425,7 +410,7 @@ Colour CheckChecker(Board board){
 
 bool DoesMoveCorrectCheck(Position newPos, int pIdx, Board board){
     bool retVal = true;
-    Board tempB = CopyBoard(board);
+    Board tempB = board.CopyBoard();
     
     tempB = PieceMove(newPos, pIdx, tempB);
     tempB = PieceCapture(newPos, pIdx, tempB);
@@ -436,8 +421,6 @@ bool DoesMoveCorrectCheck(Position newPos, int pIdx, Board board){
     if(tempB.check == black && !board.whiteToPlay){
         retVal = false;
     }
-    // if white/black under check -> move has to remove this check
-    // if not under check -> move cant apply friendly check
     return retVal;
 }
 
@@ -475,46 +458,29 @@ bool IsMoveValid(Position newPos, int pIdx, Board board, bool realMove){
 }
 
 vector<Position> InBetweenCoords(Position p1, Position p2){
+    vector<Position> retVec;
     int xDir = p1.x>p2.x ? -1 : 1;
     int yDir = p1.y>p2.y ? -1 : 1;
-    vector<Position> retVec;
-    Position tempPos;
-    if(p1.x == p2.x){ //up/down
-        for(int i=min(p1.y,p2.y)+1;i<max(p1.y,p2.y);i++){
-            tempPos.x = p1.x;
-            tempPos.y = i;
-            retVec.push_back(tempPos);
-        }
-    }else if(p1.y == p2.y){  // left/right
-        for(int i=min(p1.x,p2.x)+1;i<max(p1.x,p2.x);i++){
-            tempPos.x = i;
-            tempPos.y = p1.y;
-            retVec.push_back(tempPos);
-        }
-    }else{  // Bishop
-        for(int i=min(p1.y,p2.y)+1;i<max(p1.y,p2.y);i++){
-            tempPos.x = xDir*i+p1.x;
-            tempPos.y = yDir*i+p1.y;
-            retVec.push_back(tempPos);
-        }
+    if(p1.x == p2.x) xDir = 0;
+    if(p1.y == p2.y) yDir = 0;
+    
+    for(int i=1; i < max(abs(p1.x-p2.x),abs(p1.y-p2.y));i++){
+        Position tempPos;
+        tempPos.x = xDir*i+p1.x;
+        tempPos.y = yDir*i+p1.y;
+        retVec.push_back(tempPos);
     }
     return retVec;
 }
 
 GameResult IsCheckMate(Board board){
-    // Checkmate -> In check and no move can remove it 
-    // can king move out of check?
-    // can attackers path be blocked?
-    // can attacker be taken?
     Colour inCheck = CheckChecker(board);
     int kIdx = -1;
     vector<int> attIdx;
     if(inCheck == -1){
-        cout << "Not in check" << endl;
         return notEnded;
     }
     // determine king location
-
     for(int i=0;i< board.pieces.size();i++){
         if(board.pieces[i]->type == 'K' && inCheck == board.pieces[i]->colour){ // if p is checked king
             kIdx = i;
@@ -542,7 +508,7 @@ GameResult IsCheckMate(Board board){
         }
     }
 
-    if(attIdx.size() > 1){
+    if(attIdx.size() > 1){ // if king cant move & >1 attacker = checkmate
         return board.pieces[attIdx[0]]->colour == white ? whiteWin : blackWin;
     }
 
@@ -571,28 +537,82 @@ GameResult IsCheckMate(Board board){
 
 Pawn* SetPawnDoubleMove(Pawn* pawn, bool val){
     pawn->justDoubled = val;
-    if(pawn->justDoubled) cout << pawn->pos.x << " pawn has doubled" << endl;
     return pawn;
+}
+
+bool CanCastle(Colour colour, bool kSide, Board board){
+    Position rookPos;
+    rookPos.x = kSide ? 7 : 0;
+    rookPos.y = colour==white ? 0 : 7;
+    King* king;
+    Rook* rook;
+    for(auto p : board.pieces){
+        if(p->colour == colour){
+            if(p->type == 'K') king = (King*)p;
+            if(p->pos.x == rookPos.x && p->pos.y == rookPos.y) rook = (Rook*)p; 
+        }
+    }
+    if(king->hasMoved || rook->hasMoved){
+        Couter("Pieces have moved\n");
+        cout << king->hasMoved << rook->hasMoved << endl;
+        return false;
+    }
+
+    vector<Position> blockPos = InBetweenCoords(rook->pos, king->pos);
+    for(auto p : board.pieces){
+        for(auto pos : blockPos){
+            if(p->pos.x == pos.x && p->pos.y == pos.y){
+                cout << pos.x << pos.y << endl;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+Board CastleMove(Colour colour, bool kSide, Board board){
+    Position rookPos;
+    rookPos.x = kSide ? 7 : 0;
+    rookPos.y = colour==white ? 0 : 7;
+    int kIdx, rIdx;
+
+    for(int i=0;i<board.pieces.size();i++){
+        if(board.pieces[i]->colour == colour){
+            if(board.pieces[i]->type == 'K') kIdx = i;
+            if(board.pieces[i]->pos.x == rookPos.x && board.pieces[i]->pos.y == rookPos.y) rIdx = i; 
+        }
+    }
+
+    int xDir = kSide ? 1 : -1;
+
+    Position newKPos = board.pieces[kIdx]->pos;
+    newKPos.x += 2*xDir;
+    board = PieceMove(newKPos, kIdx, board);
+
+    Position newRPos = board.pieces[kIdx]->pos; // NEW king pos
+    newRPos.x -= xDir;
+    board = PieceMove(newRPos, rIdx, board);
+
+    board.whiteToPlay = !board.whiteToPlay;
+    board.move++;
+    return board;
 }
 
 Board MakeMove(Position newPos, int pIdx, Board board){
 
-    for(auto p : board.pieces){ // if en passant chance not taken 
+    for(auto p : board.pieces){
         if(p->type == 'P'){
-            //board = EnPassantCapture(newPos, pIdx, board);
-            Couter("EnP'ed");
             p = SetPawnDoubleMove((Pawn*)p, false);
-            Couter("Pawn flagged");
         }
     }
-    Couter("Double?");
     if(board.pieces[pIdx]->type == 'P' && abs(newPos.y - board.pieces[pIdx]->pos.y) == 2){ // If piece has made itself open to en passant
         board.pieces[pIdx] = SetPawnDoubleMove((Pawn*)board.pieces[pIdx], true);
     }
 
     switch(CheckTargetSquare(newPos, pIdx, board)){
         case -1:
-            cout << "take own piece error\n";
+            cout << "ERROR: Take own piece\n";
+            exit(EXIT_FAILURE);
             break;
         case 0:
             board = PieceMove(newPos, pIdx, board);
@@ -602,6 +622,8 @@ Board MakeMove(Position newPos, int pIdx, Board board){
             board = PieceCapture(newPos, pIdx, board);
             break;
     }
+
+    board.move++;
     return board;
 }
 
@@ -619,12 +641,12 @@ int IsSquareAttacked(Position square, Colour attackedBy, Board board){
 Position NotationCoordToPos(string input){
     Position pos;
     if(input[0] > 90) input[0] -= 32;
-    pos.x = input[0] - 65;
+    pos.x = input[0] - 65; //ascii conversion numbers
     pos.y = input[1] - 49;
     return pos;
 }
 
-char NotationPiece(string input){
+char NotationToPiece(string input){
     if(input.size() == 2) return 'P';
     return toupper(input[0]);
 }
@@ -662,13 +684,13 @@ Board FENToBoard(string fen){
                 Position pos;
                 pos.x = jCoord;
                 pos.y = BOARD_SIZE - i - 1;
-                board.pieces.push_back(CharToPiece(rows[i][j], pos));
+                board.pieces.push_back(PieceGenerator(rows[i][j], pos));
             }
             jCoord++;
         }
     }
 
-    string props = fen.substr(fenSplit);
+    string props = fen.substr(fenSplit); // properties setup
     vector<string> propsVec;
     while(props.size()){
         int index = props.find(" ");
@@ -721,21 +743,28 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
         if(input == "undo"){
             board = history.Undo();
         }
+        Colour whoTurn = board.whiteToPlay ? white : black;
+        if(input == "OO"){
+            if(CanCastle(whoTurn, true, board)) board = CastleMove(whoTurn, true, board);
+        }
+        if(input == "OOO"){
+            if(CanCastle(whoTurn, false, board)) board = CastleMove(whoTurn, false, board);
+        }
+            
         Position pos = NotationToPos(input);
-        char type = NotationPiece(input);
+        char type = NotationToPiece(input);
         for(int i=0;i<board.pieces.size();i++){
             if(board.pieces[i]->type == type && board.whiteToPlay != board.pieces[i]->colour && IsMoveValid(pos, i, board, true)){
                 cout << "Making move: " << board.pieces[i]->type << pos.x << pos.y<< " " << endl;
 
                 board = MakeMove(pos, i, board);
+
             }
         }
         if(board.move != oldMoveNum){
-            cout << "Good move!\n";
-            board.whiteToPlay = !board.whiteToPlay;
             oldMoveNum = board.move;
             history.AddBoard(board);
-            //Add move to history
+            board.whiteToPlay = !board.whiteToPlay;
         }
         board.check = CheckChecker(board);
             if(board.check == white) cout << "white in check\n";
@@ -749,8 +778,7 @@ int main() {
     board.move = 1;
     string startFEN;
     startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    //startFEN = "rnbqkbnr/pppppppp/8/7Q/2B5/4P3/PPPP1PPP/RNB1K1NR w KQkq - 0 1";
-    startFEN = "rnbpkpnr/ppppQppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1";
+    startFEN = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
     board = FENToBoard(startFEN);
 
     SimplePlay(board);
