@@ -593,7 +593,6 @@ Board CastleMove(Colour colour, bool kSide, Board board){
     newRPos.x -= xDir;
     board = PieceMove(newRPos, rIdx, board);
 
-    board.whiteToPlay = !board.whiteToPlay;
     board.move++;
     return board;
 }
@@ -755,16 +754,15 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
         char type = NotationToPiece(input);
         for(int i=0;i<board.pieces.size();i++){
             if(board.pieces[i]->type == type && board.whiteToPlay != board.pieces[i]->colour && IsMoveValid(pos, i, board, true)){
-                cout << "Making move: " << board.pieces[i]->type << pos.x << pos.y<< " " << endl;
-
                 board = MakeMove(pos, i, board);
-
             }
         }
         if(board.move != oldMoveNum){
             oldMoveNum = board.move;
             history.AddBoard(board);
             board.whiteToPlay = !board.whiteToPlay;
+        }else{
+            cout << "Invalid Move" << endl;
         }
         board.check = CheckChecker(board);
             if(board.check == white) cout << "white in check\n";
@@ -778,7 +776,7 @@ int main() {
     board.move = 1;
     string startFEN;
     startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    startFEN = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
+    //startFEN = "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1";
     board = FENToBoard(startFEN);
 
     SimplePlay(board);
