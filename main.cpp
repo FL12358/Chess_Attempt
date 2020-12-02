@@ -757,6 +757,8 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             oldMoveNum = board.move;
             history.AddBoard(board);
             board.whiteToPlay = !board.whiteToPlay;
+        }else{
+            cout << "Invalid Move" << endl;
         }
 
         board.check = CheckChecker(board);
