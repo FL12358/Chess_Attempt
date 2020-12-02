@@ -92,7 +92,6 @@ class GameHistory{
 
     void AddBoard(Board board){
         Board tempB = board.CopyBoard();
-        cout << tempB.move;
         if(!history.size()){
             history.push_back(tempB); // if next move in normal game add to end of 
         }else{
@@ -429,15 +428,14 @@ bool IsMoveValid(Position newPos, int pIdx, Board board, bool realMove){
     if(board.pieces[pIdx]->type == 'P'){ // If moving a pawn
         SetPawnCaptureFlags((Pawn*)board.pieces[pIdx], board);
         for(auto p : board.pieces){
-            if(p->pos.x == newPos.x && p->pos.y == newPos.y && board.pieces[pIdx]->pos.x == newPos.x){ 
-                cout << "Pawn blocked" << endl;
+            if(p->pos.x == newPos.x && p->pos.y == newPos.y && board.pieces[pIdx]->pos.x == newPos.x){
                 return false; // if path blocked
             }
         }
     }
     
     if(board.pieces[pIdx]->type == 'K'){ // If moving a king
-        if(IsSquareAttacked(newPos, OtherColour(board.pieces[pIdx]->colour), board)) {
+        if(IsSquareAttacked(newPos, OtherColour(board.pieces[pIdx]->colour), board)){
             return false;
         }
     }
@@ -528,6 +526,17 @@ Pawn* SetPawnDoubleMove(Pawn* pawn, bool val){
     return pawn;
 }
 
+bool EnPassantMove(Position movePos, int pIdx, Board board){ // has pawn just moved enPass?
+    Pawn* pawn = (Pawn*)board.pieces[pIdx];
+    if(pawn->pos.x == movePos.x) return false;
+    for(auto p : board.pieces){
+        if(p->pos.x == movePos.x && p->pos.y == movePos.y){
+            return false;
+        }
+    }
+    return true;
+}
+
 bool CanCastle(Colour colour, bool kSide, Board board){
     Position rookPos;
     rookPos.x = kSide ? 7 : 0;
@@ -585,42 +594,43 @@ Board CastleMove(Colour colour, bool kSide, Board board){
     return board;
 }
 
-Board MakeMove(Position newPos, int pIdx, Board board){
+Board MakeMove(Position movePos, int pIdx, Board board){
+    Position capPos;
+    capPos.x = movePos.x;
+    capPos.y = movePos.y;
 
-    for(auto p : board.pieces){
+    for(auto p : board.pieces){ // pieces no longer allowed to be captured en pass
         if(p->type == 'P'){
             p = SetPawnDoubleMove((Pawn*)p, false);
         }
     }
-    if(board.pieces[pIdx]->type == 'P' && abs(newPos.y - board.pieces[pIdx]->pos.y) == 2){
+    if(board.pieces[pIdx]->type == 'P' && abs(movePos.y - board.pieces[pIdx]->pos.y) == 2){
         // If piece has made itself open to en passant
         board.pieces[pIdx] = SetPawnDoubleMove((Pawn*)board.pieces[pIdx], true);
     }
 
-    switch(CheckTargetSquare(newPos, pIdx, board)){
-        case -1:
-            cout << "ERROR: Take own piece\n";
-            exit(EXIT_FAILURE);
-            break;
-        case 0:
-            board = PieceMove(newPos, pIdx, board);
-            break;
-        case 1:
-            board = PieceMove(newPos, pIdx, board); // pIdx loses meaning when num peices changed
-            board = PieceCapture(newPos, pIdx, board);
-            break;
+    if(board.pieces[pIdx]->type == 'P' && EnPassantMove(movePos, pIdx, board)){
+        capPos.y += board.pieces[pIdx]->colour==white ? -1 : 1;
     }
+
     board.pieces[pIdx]->hasMoved = true;
     board.move++;
+    board = PieceMove(movePos, pIdx, board); // pIdx loses meaning when num pieces changed
+    board = PieceCapture(capPos, pIdx, board);
+    
     return board;
 }
 
 int IsSquareAttacked(Position square, Colour attackedBy, Board board){ 
     // Returns number of attackers of Colour "attackedBy" aiming at an input square
+    // TODO King can move to square attacked by pawn
     int retVal = 0;
+
     for(int i=0;i<board.pieces.size();i++){
         if(IsPathClear(square, i, board) && board.pieces[i]->canMove(square) && board.pieces[i]->colour == attackedBy){
-            ++retVal;
+            if(!(board.pieces[i]->type == 'P' && square.x == board.pieces[i]->pos.x)){
+                ++retVal;
+            }
         }
     }
     return retVal; 
