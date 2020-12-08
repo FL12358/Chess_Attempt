@@ -515,7 +515,10 @@ GameResult IsCheckMate(Board board){
         if(board.pieces[i]->type == 'K' && inCheck == board.pieces[i]->colour){ // if p is checked king
             kIdx = i;
         }
+        int kCount = 0;
+        if(board.pieces[i]->type == 'K') kCount++;
     }
+
     
     King* king = (King*)board.pieces[kIdx];
     // determine attackers
