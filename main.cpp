@@ -1,12 +1,12 @@
 #include<iostream>
 #include<vector>
-#include<sstream>
-#include<cstring>
+#include<time.h>
 
 using namespace std;
 
 int BOARD_SIZE = 8;
 int DEBUG = 1;
+int INT_MAX = 1000000;
 
 void Couter(string str){
     if(DEBUG) cout << str << endl;
@@ -50,6 +50,7 @@ class Piece {
     
     Piece(){
     }
+    virtual ~Piece() = default;
     virtual bool canMove(Position newPos) = 0; // If piece can move to square if empty board
 
     private:
@@ -136,6 +137,8 @@ class Rook: public Piece {
         if(pos.x == newPos.x || pos.y == newPos.y) return true;
         return false;
     }
+    protected:
+    ~Rook() = default;
 };
 
 class Bishop: public Piece {
@@ -151,6 +154,8 @@ class Bishop: public Piece {
         if(abs(pos.x-newPos.x) == abs(pos.y-newPos.y)) return true;
         return false;
     }
+    protected:
+    ~Bishop() = default;
 };
 
 class Queen: public Piece {
@@ -167,6 +172,8 @@ class Queen: public Piece {
         if(pos.x == newPos.x || pos.y == newPos.y) return true;
         return false;
     }
+    protected:
+    ~Queen() = default;
 };
 
 class King: public Piece {
@@ -184,6 +191,8 @@ class King: public Piece {
         if((changeX == 0 || changeX == 1) && (changeY == 0 || changeY == 1)) return true;
         return false;
     }
+    protected:
+    ~King() = default;
 };
 
 class Knight: public Piece {
@@ -199,6 +208,8 @@ class Knight: public Piece {
         if(abs(pos.x-newPos.x) == 2 && abs(pos.y-newPos.y) == 1) return true;
         return false;
     }
+    protected:
+    ~Knight() = default;
 };
 
 class Pawn: public Piece {
@@ -229,7 +240,7 @@ class Pawn: public Piece {
     }
 
     bool canAttack(Position newPos, Board board){
-        int yDir = colour==white ? 1 : -1;
+        int yDir = colour == white ? 1 : -1;
         if(abs(pos.x-newPos.x)==1 && yDir==(newPos.y-pos.y)){
             for(auto p : board.pieces){
                 if(p->pos.x == newPos.x && p->pos.y == newPos.y) return true;
@@ -241,7 +252,16 @@ class Pawn: public Piece {
         }
         return false;
     }
+    protected:
+    ~Pawn() = default;
 };
+
+void BoardDestructor(Board board){
+    for(auto p : board.pieces){
+        delete p;
+    }
+}
+
 
 Piece* PieceGenerator(char ch, Position pos){
     Colour colour = white;
@@ -389,11 +409,9 @@ Pawn* EnPassantFlags(Pawn* p1, Pawn* p2){
         // check if p2 has just jumped -> go 
         if(p2->pos.x == p1->pos.x-1){
             p1->canTakeL = true;
-            cout << "en pass L\n";
         }
         if(p2->pos.x == p1->pos.x+1){
             p1->canTakeR = true;
-            cout << "en pass R\n";
         }
     }
     return p1;
@@ -452,12 +470,20 @@ bool DoesMoveCorrectCheck(Position newPos, int pIdx, Board board){
     if(tempB.check == black && !board.whiteToPlay){
         retVal = false;
     }
+    BoardDestructor(tempB);
     return retVal;
 }
 
 bool IsMoveValid(Position newPos, int pIdx, Board board, bool realMove){
+    if(!IsPosOnBoard(newPos)) return false; // if not on board
+    if(CheckTargetSquare(newPos, pIdx, board)==-1) return false; // if same colour on square
+
     if(board.pieces[pIdx]->type == 'P'){ // If moving a pawn
-        SetPawnCaptureFlags((Pawn*)board.pieces[pIdx], board);
+        bool moveDir = board.pieces[pIdx]->colour==white ? 1 : 0;
+        board.pieces[pIdx] = SetPawnCaptureFlags((Pawn*)board.pieces[pIdx], board);
+        if(moveDir == (newPos.y < board.pieces[pIdx]->pos.y)){
+            return false;
+        }
         for(auto p : board.pieces){
             if(p->pos.x == newPos.x && p->pos.y == newPos.y && board.pieces[pIdx]->pos.x == newPos.x){
                 return false; // if path blocked
@@ -471,21 +497,8 @@ bool IsMoveValid(Position newPos, int pIdx, Board board, bool realMove){
         }
     }
     bool check = realMove ? DoesMoveCorrectCheck(newPos, pIdx, board) : 1;
-    if( IsPosOnBoard(newPos) && 
-        IsPathClear(newPos, pIdx, board) && 
-        board.pieces[pIdx]->canMove(newPos) && 
-        check){
-            switch(CheckTargetSquare(newPos, pIdx, board)){
-            case -1:
-                return false;
-                break;
-            case 0:
-                return true;
-                break;
-            case 1:
-                return true;
-                break;
-        }
+    if(IsPathClear(newPos, pIdx, board) && board.pieces[pIdx]->canMove(newPos) && check){
+        return true;
     }
     return false;
 }
@@ -633,6 +646,7 @@ Board MakeMove(Position movePos, int pIdx, Board board){
     }
     if(board.pieces[pIdx]->type == 'P' && abs(movePos.y - board.pieces[pIdx]->pos.y) == 2){
         // If piece has made itself open to en passant
+        SetPawnCaptureFlags((Pawn*)board.pieces[pIdx], board);
         board.pieces[pIdx] = SetPawnDoubleMove((Pawn*)board.pieces[pIdx], true);
     }
 
@@ -763,28 +777,71 @@ Board FENToBoard(string fen){
 vector<Position> PieceMoveGenerator(int pIdx, Board board){
     // returns all valid position moves for pIdx piece
     vector<Position> retArr;
+    vector<Position> posArr;
+    Position pos;
+    Piece* piece = board.pieces[pIdx];
 
-    for(int i=0;i<BOARD_SIZE;i++){ // TODO improve this method
-        for(int j=0;j<BOARD_SIZE;j++){
-            Position pos;
-            pos.x = i;
-            pos.y = j;
+    if(piece->type == 'P' || piece->type == 'K'){
+        for(int i=-1;i<=1;i++){
+            pos.x = piece->pos.x + i;
+            for(int j=-2;j<=2;j++){
+                pos.y = piece->pos.y + j;
+                if(IsMoveValid(pos, pIdx, board, true)){
+                    retArr.push_back(pos);
+                }
+            }
+        }
+    }
+    if(piece->type == 'R' || piece->type == 'Q'){
+        for(int i=-7;i<=7;i++){
+            pos.x = piece->pos.x;
+            pos.y = piece->pos.y+i;
             if(IsMoveValid(pos, pIdx, board, true)){
-
                 retArr.push_back(pos);
             }
-            
+
+            pos.y = piece->pos.y;
+            pos.x = piece->pos.x+i;
+            if(IsMoveValid(pos, pIdx, board, true)){
+                retArr.push_back(pos);
+            }
+        }
+    }
+    if(piece->type == 'B' || piece->type == 'Q'){
+        for(int i=-7;i<=7;i++){
+            pos.x = piece->pos.x + i;
+            pos.y = piece->pos.y + i;
+            if(IsMoveValid(pos, pIdx, board, true)){
+                retArr.push_back(pos);
+            }
+            pos.y = piece->pos.y - i;
+            if(IsMoveValid(pos, pIdx, board, true)){
+                retArr.push_back(pos);
+            }
+        }
+    }
+    if(piece->type == 'N'){
+        int moves[4]{-2,-1,1,2};
+        for(auto i : moves){
+            for(auto j : moves){
+                if(i!=j){
+                    pos.x = piece->pos.x + i;
+                    pos.y = piece->pos.y + j;
+                    if(IsMoveValid(pos, pIdx, board, true)){
+                        retArr.push_back(pos);
+                    }
+                }
+            }
         }
     }
     return retArr;
 }
 
-vector<Board> AllMoveGenerator(Board inputBoard){
+vector<Board> AllMoveGenerator(Board inputBoard, Colour toPlay){
     vector<Board> outputBoards;
 
     for(size_t i=0;i<inputBoard.pieces.size();i++){
-        bool side = inputBoard.pieces[i]->colour==white ? true : false;
-        if(inputBoard.whiteToPlay == side){
+        if(inputBoard.pieces[i]->colour == toPlay){
             vector<Position> pMoves = PieceMoveGenerator(i, inputBoard);
             for(Position p : pMoves){
                 Board tempBoard = MakeMove(p, i, inputBoard.CopyBoard());
@@ -797,7 +854,16 @@ vector<Board> AllMoveGenerator(Board inputBoard){
 
 int BoardHeuristic(Board board){
     int score = 0;
-
+    int squareVals[8][8]{
+        {0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0},
+        {0,1,1,1,1,1,1,0},
+        {0,1,1,2,2,1,1,0},
+        {0,1,1,2,2,1,1,0},
+        {0,1,1,1,1,1,1,0},
+        {0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0},
+    };
     for(auto p : board.pieces){ // Piece scoring
         int side = p->colour==white ? 1 : -1;
         int points = 0;
@@ -823,8 +889,12 @@ int BoardHeuristic(Board board){
         }
         score += side*points;
 
+        score += side*squareVals[p->pos.x][p->pos.y];
+
         if(p->hasMoved) score += side*1; // developed pieces advantage
     }
+
+
 
     if(board.check==white) score += 10; // check scoring
     if(board.check==black) score -= 10;
@@ -832,7 +902,7 @@ int BoardHeuristic(Board board){
     return score;
 }
 
-EngineMove NegaMax(int depth, Board board){
+EngineMove NegaMax(int depth, Board board, int a, int b){
     EngineMove eMove;
     GameResult result = IsCheckMate(board);
     if(depth == 0 || result == whiteWin || result == blackWin){
@@ -840,13 +910,20 @@ EngineMove NegaMax(int depth, Board board){
         eMove.score = side*BoardHeuristic(board);
         return eMove;
     }
-    int value = -100000;
-    vector<Board> boardArr = AllMoveGenerator(board);
-    for(auto b : boardArr){
-        int temp = max(value, -NegaMax(depth-1, b).score);
+
+    int value = -INT_MAX;
+    vector<Board> boardArr = AllMoveGenerator(board, board.whiteToPlay ? white : black);
+    for(auto brd : boardArr){
+        int temp = max(value, -NegaMax(depth-1, brd, -a, -b).score);
         if(temp != value){
             value = temp;
-            eMove.board = b;
+            eMove.board = brd;
+        }else{
+            BoardDestructor(brd);
+        }
+        a = max(value, a);
+        if(a >= b){
+            break;
         }
     }
     eMove.score = value;
@@ -859,21 +936,22 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
     history.AddBoard(board);
     GameResult result = notEnded;
 
-    
-
     while(result == notEnded){
         PrintBoard(board);
+
         if(!board.whiteToPlay){
-            cout << "Calculating...\n";
-            EngineMove eMove = NegaMax(2, board);
+            clock_t startT = clock();
+            Couter("Calculating... ");
+            EngineMove eMove = NegaMax(4, board, -INT_MAX, INT_MAX);
+            Couter("Done");
             board = eMove.board;
             history.AddBoard(board);
             board.whiteToPlay = !board.whiteToPlay;
+            printf("Execution Time (s):  %.4lf\n",(double)(clock()-startT)/CLOCKS_PER_SEC);
             continue;
         }
-    
 
-        cout << "num possible moves: " << AllMoveGenerator(board).size() << endl;
+        cout << "Num possible moves: " << AllMoveGenerator(board, board.whiteToPlay ? white : black).size() << endl;
 
         if(board.whiteToPlay){
             cout << board.move << " White: ";
@@ -933,7 +1011,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
 
 int main() {
     string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    //startFEN = "2r3k1/p4p1p/4p1p1/Q2n4/8/8/Pq1BKPPP/7R w - - 0 2";
+    //startFEN = "rn1qkb1r/pppb1ppp/3p1n2/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 5";
 
     SimplePlay(FENToBoard(startFEN));
 
