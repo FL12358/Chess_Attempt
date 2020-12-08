@@ -39,6 +39,8 @@ struct Position{
 
 class Board;
 
+
+
 class Piece {
     public:
     Position pos; // [a-h][1-8]
@@ -89,6 +91,11 @@ class Board{
         }
         return retBoard;
     }
+};
+
+struct EngineMove{
+    int score;
+    Board board;
 };
 
 class GameHistory{
@@ -429,6 +436,11 @@ Colour CheckChecker(Board board){
 
 bool DoesMoveCorrectCheck(Position newPos, int pIdx, Board board){
     bool retVal = true;
+    for(auto p : board.pieces){
+        if(p->pos.x == newPos.x && p->pos.y == newPos.y && p->type == 'K'){
+            return retVal;
+        }
+    }
     Board tempB = board.CopyBoard();
     
     tempB = PieceMove(newPos, pIdx, tempB);
@@ -508,7 +520,6 @@ GameResult IsCheckMate(Board board){
             testPos.x = king->pos.x + i;
             testPos.y = king->pos.y + j;
             if(IsMoveValid(testPos, kIdx, board, false)){
-                cout << "King can move" << endl;
                 return notEnded;
             }
         }
@@ -520,7 +531,6 @@ GameResult IsCheckMate(Board board){
 
     for(size_t i=0;i<board.pieces.size();i++){ // check if piece can be captured
         if(board.pieces[i]->colour == inCheck && IsMoveValid(board.pieces[attIdx[0]]->pos, i, board, false)){
-            cout << "Attacker can be captured" << endl;
             return notEnded;
         }
     }
@@ -529,7 +539,6 @@ GameResult IsCheckMate(Board board){
     for(Position pos : blockPos){
         for(size_t i=0;i<board.pieces.size();i++){ // check if piece can be captured
             if(board.pieces[i]->colour == inCheck && IsMoveValid(pos, i, board, false)){
-                cout << "Attack can be blocked" << endl;
                 return notEnded;
             }
         }
@@ -751,6 +760,98 @@ Board FENToBoard(string fen){
     return board;
 }
 
+vector<Position> PieceMoveGenerator(int pIdx, Board board){
+    // returns all valid position moves for pIdx piece
+    vector<Position> retArr;
+
+    for(int i=0;i<BOARD_SIZE;i++){ // TODO improve this method
+        for(int j=0;j<BOARD_SIZE;j++){
+            Position pos;
+            pos.x = i;
+            pos.y = j;
+            if(IsMoveValid(pos, pIdx, board, true)){
+
+                retArr.push_back(pos);
+            }
+            
+        }
+    }
+    return retArr;
+}
+
+vector<Board> AllMoveGenerator(Board inputBoard){
+    vector<Board> outputBoards;
+
+    for(size_t i=0;i<inputBoard.pieces.size();i++){
+        bool side = inputBoard.pieces[i]->colour==white ? true : false;
+        if(inputBoard.whiteToPlay == side){
+            vector<Position> pMoves = PieceMoveGenerator(i, inputBoard);
+            for(Position p : pMoves){
+                Board tempBoard = MakeMove(p, i, inputBoard.CopyBoard());
+                outputBoards.push_back(tempBoard);
+            }
+        }
+    }
+    return outputBoards;
+}
+
+int BoardHeuristic(Board board){
+    int score = 0;
+
+    for(auto p : board.pieces){ // Piece scoring
+        int side = p->colour==white ? 1 : -1;
+        int points = 0;
+        switch(p->type){
+            case 'P':
+                points = 10;
+                break;
+            case 'N':
+                points = 30;
+                break;
+            case 'B':
+                points = 30;
+                break;
+            case 'R':
+                points = 50;
+                break;
+            case 'Q':
+                points = 90;
+                break;
+            case 'K':
+                points = 1000;
+                break;
+        }
+        score += side*points;
+
+        if(p->hasMoved) score += side*1; // developed pieces advantage
+    }
+
+    if(board.check==white) score += 10; // check scoring
+    if(board.check==black) score -= 10;
+
+    return score;
+}
+
+EngineMove NegaMax(int depth, Board board){
+    EngineMove eMove;
+    GameResult result = IsCheckMate(board);
+    if(depth == 0 || result == whiteWin || result == blackWin){
+        int side = board.whiteToPlay ? 1 : -1;
+        eMove.score = side*BoardHeuristic(board);
+        return eMove;
+    }
+    int value = -100000;
+    vector<Board> boardArr = AllMoveGenerator(board);
+    for(auto b : boardArr){
+        int temp = max(value, -NegaMax(depth-1, b).score);
+        if(temp != value){
+            value = temp;
+            eMove.board = b;
+        }
+    }
+    eMove.score = value;
+    return eMove;
+}
 
 void SimplePlay(Board board){ // simple loop to take turns attempting moves
     int oldMoveNum = board.move;
@@ -758,14 +859,28 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
     history.AddBoard(board);
     GameResult result = notEnded;
 
+    
+
     while(result == notEnded){
         PrintBoard(board);
+        if(!board.whiteToPlay){
+            cout << "Calculating...\n";
+            EngineMove eMove = NegaMax(2, board);
+            board = eMove.board;
+            history.AddBoard(board);
+            board.whiteToPlay = !board.whiteToPlay;
+            continue;
+        }
+    
+
+        cout << "num possible moves: " << AllMoveGenerator(board).size() << endl;
+
         if(board.whiteToPlay){
             cout << board.move << " White: ";
         }else{
             cout << board.move << " Black: ";
         }
-
+        
         string input;
         cin >> input;
         if(input == "undo"){
@@ -781,8 +896,6 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             
         Position pos = NotationToPos(input);
         char type = NotationToPiece(input);
-
-        
 
         for(size_t i=0;i<board.pieces.size();i++){
             Piece* p = board.pieces[i];
@@ -800,6 +913,8 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
                     cout << "+";
                 }
                 cout << endl;
+                cout << "Board score: " << BoardHeuristic(board) << endl;
+                
             }
         }
         if(board.move != oldMoveNum){
@@ -818,7 +933,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
 
 int main() {
     string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    startFEN = "2r3k1/p4p1p/4p1p1/Q2n4/8/8/Pq1BKPPP/7R w - - 0 2";
+    //startFEN = "2r3k1/p4p1p/4p1p1/Q2n4/8/8/Pq1BKPPP/7R w - - 0 2";
 
     SimplePlay(FENToBoard(startFEN));
 
