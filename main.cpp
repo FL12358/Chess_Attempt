@@ -7,7 +7,7 @@ using namespace std;
 int BOARD_SIZE = 8;
 int DEBUG = 1;
 int MY_INT_MAX = 1000000;
-int SEARCH_DEPTH = 3;
+int SEARCH_DEPTH = 4;
 
 void Couter(string str){
     if(DEBUG) cout << str;
@@ -941,8 +941,9 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
     GameHistory history;
     history.AddBoard(board);
     GameResult result = notEnded;
-
+    
     while(result == notEnded){
+        cout << "Board evaluation: " << BoardHeuristic(board) << endl;
         PrintBoard(board);
 
         if(!board.whiteToPlay){
@@ -1002,7 +1003,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
                     cout << "+";
                 }
                 cout << endl;
-                cout << "Board score: " << BoardHeuristic(board) << endl;
+                
                 board.whiteToPlay = !board.whiteToPlay;
                 history.AddBoard(board);
                 
