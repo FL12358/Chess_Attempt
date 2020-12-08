@@ -6,10 +6,11 @@ using namespace std;
 
 int BOARD_SIZE = 8;
 int DEBUG = 1;
-int INT_MAX = 1000000;
+int MY_INT_MAX = 1000000;
+int SEARCH_DEPTH = 3;
 
 void Couter(string str){
-    if(DEBUG) cout << str << endl;
+    if(DEBUG) cout << str;
 }
 
 enum Colour{
@@ -115,7 +116,6 @@ class GameHistory{
         currentMove = tempB.move;
     }
     Board Undo(){
-        cout << currentMove;
         history[currentMove].whiteToPlay = !history[currentMove].whiteToPlay;
         return history[currentMove];
     }
@@ -903,17 +903,24 @@ int BoardHeuristic(Board board){
 }
 
 EngineMove NegaMax(int depth, Board board, int a, int b){
+    //PrintBoard(board);
     EngineMove eMove;
-    GameResult result = IsCheckMate(board);
-    if(depth == 0 || result == whiteWin || result == blackWin){
+    if(depth == 0 ){
         int side = board.whiteToPlay ? 1 : -1;
         eMove.score = side*BoardHeuristic(board);
         return eMove;
     }
+    GameResult result = IsCheckMate(board);
+    if(result == whiteWin || result == blackWin){
+        int side = board.whiteToPlay ? 1 : -1;
+        eMove.score = side*MY_INT_MAX;
+        return eMove;
+    }
 
-    int value = -INT_MAX;
+    int value = -MY_INT_MAX;
     vector<Board> boardArr = AllMoveGenerator(board, board.whiteToPlay ? white : black);
     for(auto brd : boardArr){
+        brd.whiteToPlay = !board.whiteToPlay;
         int temp = max(value, -NegaMax(depth-1, brd, -b, -a).score);
         if(temp != value){
             value = temp;
@@ -940,13 +947,12 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
 
         if(!board.whiteToPlay){
             clock_t startT = clock();
-            Couter("Calculating... ");
-            EngineMove eMove = NegaMax(4, board, -INT_MAX, INT_MAX);
-            Couter("Done");
+            Couter("Calculating... \n");
+            EngineMove eMove = NegaMax(SEARCH_DEPTH, board, -MY_INT_MAX, MY_INT_MAX);
+            Couter("\nDone\n");
             board = eMove.board;
-            history.AddBoard(board);
-            board.whiteToPlay = !board.whiteToPlay;
-            printf("Execution Time (s):  %.4lf\n",(double)(clock()-startT)/CLOCKS_PER_SEC);
+            //history.AddBoard(board);
+            printf("Execution Time (s):  %.2lf\n",(double)(clock()-startT)/CLOCKS_PER_SEC);
             continue;
         }
 
@@ -965,10 +971,16 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
         }
         Colour whoTurn = board.whiteToPlay ? white : black;
         if(input == "OO"){
-            if(CanCastle(whoTurn, true, board)) board = CastleMove(whoTurn, true, board);
+            if(CanCastle(whoTurn, true, board)){
+                board.whiteToPlay = !board.whiteToPlay;
+                board = CastleMove(whoTurn, true, board);
+            }
         }
         if(input == "OOO"){
-            if(CanCastle(whoTurn, false, board)) board = CastleMove(whoTurn, false, board);
+            if(CanCastle(whoTurn, false, board)){
+                board.whiteToPlay = !board.whiteToPlay;
+                board = CastleMove(whoTurn, false, board);
+            }
         }
             
         Position pos = NotationToPos(input);
@@ -991,15 +1003,14 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
                 }
                 cout << endl;
                 cout << "Board score: " << BoardHeuristic(board) << endl;
+                board.whiteToPlay = !board.whiteToPlay;
+                history.AddBoard(board);
                 
             }
         }
-        if(board.move != oldMoveNum){
-            oldMoveNum = board.move;
-            history.AddBoard(board);
-            board.whiteToPlay = !board.whiteToPlay;
-        }else{
+        if(board.move == oldMoveNum){
             cout << "Invalid Move" << endl;
+            oldMoveNum = board.move;
         }
 
         board.check = CheckChecker(board);
