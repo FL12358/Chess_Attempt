@@ -914,13 +914,12 @@ EngineMove NegaMax(int depth, Board board, int a, int b){
     int value = -INT_MAX;
     vector<Board> boardArr = AllMoveGenerator(board, board.whiteToPlay ? white : black);
     for(auto brd : boardArr){
-        int temp = max(value, -NegaMax(depth-1, brd, -a, -b).score);
+        int temp = max(value, -NegaMax(depth-1, brd, -b, -a).score);
         if(temp != value){
             value = temp;
-            eMove.board = brd;
-        }else{
-            BoardDestructor(brd);
+            eMove.board = brd.CopyBoard();
         }
+        BoardDestructor(brd);
         a = max(value, a);
         if(a >= b){
             break;
