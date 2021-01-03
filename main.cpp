@@ -7,7 +7,7 @@ using namespace std;
 int BOARD_SIZE = 8;
 int DEBUG = 1;
 int MY_INT_MAX = 1000000;
-int SEARCH_DEPTH = 4;
+int SEARCH_DEPTH = 3;
 
 void Couter(string str){
     if(DEBUG) cout << str;
@@ -855,52 +855,127 @@ vector<Board> AllMoveGenerator(Board inputBoard, Colour toPlay){
     return outputBoards;
 }
 
+int PosValueGenerator(Piece* p){
+    // Position evaluation dependant on piece
+    int yPos = p->colour==white ? p->pos.y : 7-p->pos.y; // calculate apparant squareVals position
+    int pawnVals[8][8] = {
+                {0,  0,  0,  0,  0,  0,  0,  0},
+                {50, 50, 50, 50, 50, 50, 50, 50},
+                {10, 10, 20, 30, 30, 20, 10, 10},
+                {5,  5, 10, 25, 25, 10,  5,  5},
+                {0,  0,  0, 20, 20,  0,  0,  0},
+                {5, -5,-10,  0,  0,-10, -5,  5},
+                {5, 10, 10,-20,-20, 10, 10,  5},
+                {0,  0,  0,  0,  0,  0,  0,  0}
+            };
+    int knightVals[8][8] = {
+                {-50,-40,-30,-30,-30,-30,-40,-50},
+                {-40,-20,  0,  0,  0,  0,-20,-40},
+                {-30,  0, 10, 15, 15, 10,  0,-30},
+                {-30,  5, 15, 20, 20, 15,  5,-30},
+                {-30,  0, 15, 20, 20, 15,  0,-30},
+                {-30,  5, 10, 15, 15, 10,  5,-30},
+                {-40,-20,  0,  5,  5,  0,-20,-40},
+                {-50,-40,-30,-30,-30,-30,-40,-50}
+            };
+    int bishopVals[8][8] = {
+                {-20,-10,-10,-10,-10,-10,-10,-20},
+                {-10,  0,  0,  0,  0,  0,  0,-10},
+                {-10,  0,  5, 10, 10,  5,  0,-10},
+                {-10,  5,  5, 10, 10,  5,  5,-10},
+                {-10,  0, 10, 10, 10, 10,  0,-10},
+                {-10, 10, 10, 10, 10, 10, 10,-10},
+                {-10,  5,  0,  0,  0,  0,  5,-10},
+                {-20,-10,-10,-10,-10,-10,-10,-20}
+            };
+    int rookVals[8][8] = {
+                {0,  0,  0,  0,  0,  0,  0,  0},
+                {5, 10, 10, 10, 10, 10, 10,  5},
+                {-5,  0,  0,  0,  0,  0,  0, -5},
+                {-5,  0,  0,  0,  0,  0,  0, -5},
+                {-5,  0,  0,  0,  0,  0,  0, -5},
+                {-5,  0,  0,  0,  0,  0,  0, -5},
+                {-5,  0,  0,  0,  0,  0,  0, -5},
+                {0,  0,  0,  5,  5,  0,  0,  0}
+            };
+    int queenVals[8][8] = {
+                {-20,-10,-10, -5, -5,-10,-10,-20},
+                {-10,  0,  0,  0,  0,  0,  0,-10},
+                {-10,  0,  5,  5,  5,  5,  0,-10},
+                {-5,  0,  5,  5,  5,  5,  0, -5},
+                {0,  0,  5,  5,  5,  5,  0, -5},
+                {-10,  5,  5,  5,  5,  5,  0,-10},
+                {-10,  0,  5,  0,  0,  0,  0,-10},
+                {-20,-10,-10, -5, -5,-10,-10,-20}
+            };
+    int kingVals[8][8] = {
+                {-30,-40,-40,-50,-50,-40,-40,-30},
+                {-30,-40,-40,-50,-50,-40,-40,-30},
+                {-30,-40,-40,-50,-50,-40,-40,-30},
+                {-30,-40,-40,-50,-50,-40,-40,-30},
+                {-20,-30,-30,-40,-40,-30,-30,-20},
+                {-10,-20,-20,-20,-20,-20,-20,-10},
+                {20, 20,  0,  0,  0,  0, 20, 20},
+                {20, 30, 10,  0,  0, 10, 30, 20}
+            };
+    
+    switch(p->type){
+        case 'P':
+            return pawnVals[p->pos.x][yPos];
+            break;
+        case 'N':
+            return knightVals[p->pos.x][yPos];
+            break;
+        case 'B':
+            return bishopVals[p->pos.x][yPos];
+            break;
+        case 'R':
+            return rookVals[p->pos.x][yPos];
+            break;
+        case 'Q':
+            return queenVals[p->pos.x][yPos];
+            break;
+        case 'K':
+            return kingVals[p->pos.x][yPos];
+            break;
+    }
+}
+
 int BoardHeuristic(Board board){
     int score = 0;
-    int squareVals[8][8]{
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-        {0,1,1,1,1,1,1,0},
-        {0,1,1,2,2,1,1,0},
-        {0,1,1,2,2,1,1,0},
-        {0,1,1,1,1,1,1,0},
-        {0,0,0,0,0,0,0,0},
-        {0,0,0,0,0,0,0,0},
-    };
+
     for(auto p : board.pieces){ // Piece scoring
         int side = p->colour==white ? 1 : -1;
         int points = 0;
         switch(p->type){
             case 'P':
-                points = 10;
+                points = 100;
                 break;
             case 'N':
-                points = 30;
+                points = 300;
                 break;
             case 'B':
-                points = 30;
+                points = 300;
                 break;
             case 'R':
-                points = 50;
+                points = 500;
                 break;
             case 'Q':
-                points = 90;
+                points = 900;
                 break;
             case 'K':
-                points = 1000;
+                points = 10000;
                 break;
         }
         score += side*points;
 
-        score += side*squareVals[p->pos.x][p->pos.y];
+        score += side*PosValueGenerator(p);
 
         if(p->hasMoved) score += side*1; // developed pieces advantage
     }
 
-
-
-    if(board.check==white) score += 10; // check scoring
-    if(board.check==black) score -= 10;
+    if(board.check==white) score += 100; // check scoring
+    if(board.check==black) score -= 100;
 
     return score;
 }
@@ -960,7 +1035,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             continue;
         }
 
-        cout << "Num possible moves: " << AllMoveGenerator(board, board.whiteToPlay ? white : black).size() << endl;
+        //cout << "Num possible moves: " << AllMoveGenerator(board, board.whiteToPlay ? white : black).size() << endl;
 
         if(board.whiteToPlay){
             cout << board.move << " White: ";
