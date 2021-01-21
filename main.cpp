@@ -396,7 +396,7 @@ Board PieceMove(Position newPos, int pIdx, Board board){ // Simply moves a piece
 
 Board PieceCapture(Position capPos, int pIdx, Board board){ // deletes a piece in certain position
     for(size_t i=0;i<board.pieces.size();i++){
-        if(capPos.x == board.pieces[i]->pos.x && capPos.y == board.pieces[i]->pos.y && (int)i != pIdx){
+        if((int)i != pIdx && capPos.y == board.pieces[i]->pos.y && capPos.x == board.pieces[i]->pos.x){
             board.pieces.erase(board.pieces.begin()+i);
             break;
         }
@@ -497,7 +497,7 @@ bool IsMoveValid(Position newPos, int pIdx, Board board, bool realMove){
         }
     }
     bool check = realMove ? DoesMoveCorrectCheck(newPos, pIdx, board) : 1;
-    if(IsPathClear(newPos, pIdx, board) && board.pieces[pIdx]->canMove(newPos) && check){
+    if( board.pieces[pIdx]->canMove(newPos) && check && IsPathClear(newPos, pIdx, board)){
         return true;
     }
     return false;
@@ -678,7 +678,7 @@ int IsSquareAttacked(Position square, Colour attackedBy, Board board){
             canMove = p->canMove(square);
         }
 
-        if(IsPathClear(square, i, board) && canMove && p->colour == attackedBy){
+        if(canMove && p->colour == attackedBy && IsPathClear(square, i, board)){
             if(!(p->type == 'P' && square.x == p->pos.x)){
                 ++retVal;
             }
@@ -971,7 +971,7 @@ int BoardHeuristic(Board board){
 
         score += side*PosValueGenerator(p);
 
-        if(p->hasMoved) score += side*1; // developed pieces advantage
+        if(p->hasMoved) score += side*10; // developed pieces advantage
     }
 
     if(board.check==white) score += 100; // check scoring
@@ -1100,7 +1100,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
 
 int main() {
     string startFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-    //startFEN = "rn1qkb1r/pppb1ppp/3p1n2/1B2p3/4P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 4 5";
+    //startFEN = "1q7/8/8/8/8/P7/2k5/K7 w KQkq - 0 0";
 
     SimplePlay(FENToBoard(startFEN));
 
