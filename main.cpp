@@ -1,6 +1,7 @@
 #include<iostream>
 #include<vector>
 #include<time.h>
+#include<math.h>
 
 using namespace std;
 
@@ -614,7 +615,8 @@ Board CastleMove(Colour colour, bool kSide, Board board){
     Position rookPos;
     rookPos.x = kSide ? 7 : 0;
     rookPos.y = colour==white ? 0 : 7;
-    int kIdx, rIdx;
+    int kIdx=-1;
+    int rIdx=-1;
 
     for(size_t i=0;i<board.pieces.size();i++){
         if(board.pieces[i]->colour == colour){
@@ -1028,7 +1030,6 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             clock_t startT = clock();
             Couter("Calculating... \n");
             EngineMove eMove = NegaMax(SEARCH_DEPTH, board, -MY_INT_MAX, MY_INT_MAX);
-            Couter("\nDone\n");
             board = eMove.board;
             //history.AddBoard(board);
             printf("Execution Time (s):  %.2lf\n",(double)(clock()-startT)/CLOCKS_PER_SEC);
@@ -1069,7 +1070,7 @@ void SimplePlay(Board board){ // simple loop to take turns attempting moves
             Piece* p = board.pieces[i];
             if(p->type == type && board.whiteToPlay != p->colour && IsMoveValid(pos, i, board, true)){
 
-                cout << "Making move: \a" << PosToNotation(pos);
+                cout << "Making move: " << PosToNotation(pos);
                 board = MakeMove(pos, i, board);
                 if(IsCheckMate(board) == whiteWin){
                     cout << "#";
