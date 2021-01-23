@@ -827,8 +827,8 @@ vector<Position> PieceMoveGenerator(int pIdx, Board board){
     }
     if(piece->type == 'N'){
         int moves[4]{-2,-1,1,2};
-        for(auto i : moves){
-            for(auto j : moves){
+        for(int i : moves){
+            for(int j : moves){
                 if(i!=j){
                     pos.x = piece->pos.x + i;
                     pos.y = piece->pos.y + j;
